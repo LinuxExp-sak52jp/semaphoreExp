@@ -60,15 +60,15 @@ int main(int ac, char *av[])
     if (cpid == 0) {
         //-------------- 子プロセス -------------------
         sem_wait(childSem);
-        WriteSync("(1)Start 1st job of Child");
+        WriteSync("(2)Start 1st job of Child");
         DoJob();
-        WriteSync("(2)Waiting Parent done 1st job");
+        WriteSync("(3)Waiting Parent done 1st job");
         sem_post(parentSem);
         sem_wait(childSem);
 
-        WriteSync("(3)Start 2nd job of Child");
+        WriteSync("(6)Start 2nd job of Child");
         DoJob();
-        WriteSync("(4)Child will exit");
+        WriteSync("(7)Child will exit");
         sem_post(parentSem);
         sem_wait(childSem);
 
@@ -87,18 +87,18 @@ int main(int ac, char *av[])
         sem_post(childSem);
         sem_wait(parentSem);
         
-        WriteSync("(2)Start 1st job of Parent");
+        WriteSync("(4)Start 1st job of Parent");
         DoJob();
-        WriteSync("(3)Waiting Child done 2nd job");
+        WriteSync("(5)Waiting Child done 2nd job");
         sem_post(childSem);
         sem_wait(parentSem);
 
-        WriteSync("(4)Waiting Child exits");
+        WriteSync("(8)Waiting Child exits");
         sem_post(childSem);
         int status;
         waitpid(cpid, &status, 0);
 
-        WriteSync("(5)Got child exied");
+        WriteSync("(9)Got child exied");
 
         if (sem_close(parentSem)) {
             perror(__FUNCTION__);

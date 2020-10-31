@@ -1,7 +1,7 @@
 CFLAGS = -I. -Wall -MMD -g3
 LDFLAGS = -lpthread -lrt
 
-TARGETS = ProccessRace ProccessRace2 ProccessRace3 ProccessRace4
+TARGETS = ProccessSyncBy2Sems ProccessRace2 ProccessRace3 ProccessRace4
 
 all: $(TARGETS)
 
