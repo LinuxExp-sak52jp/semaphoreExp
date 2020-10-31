@@ -1,6 +1,9 @@
 /*
- * どうにもうまくいかないコード。
- * post->yield->waitとしても、権利が相手に渡らず自身で再度とってしまう。
+ * セマフォ一つとsched_yield()で同期を試みたが、結局sleepしないと意図した
+ * 動作にならなかった。sem_postとsched_yieldの間に相手がReady Queueに
+ * つながる保証がないためにこうなってしまう。sem_postではなく、一度の呼び出しで
+ * アトミックに相手がReadyになるリソースを用いないとsched_yield()は使い物に
+ * ならない。
  */
 #include <stdio.h>
 #include <stdlib.h>

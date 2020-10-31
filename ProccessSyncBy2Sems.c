@@ -1,3 +1,7 @@
+/*
+ * ２つのセマフォで確実な同期制御を行う実装。特にリアルタイムスケジューリングに
+ * しなくても要件を満たせる方式。
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>

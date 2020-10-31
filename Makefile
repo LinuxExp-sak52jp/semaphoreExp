@@ -1,20 +1,20 @@
 CFLAGS = -I. -Wall -MMD -g3
 LDFLAGS = -lpthread -lrt
 
-TARGETS = ProccessSyncBy2Sems ProccessRace2 ProccessRace3 ProccessRace4
+TARGETS = ProccessSyncBy2Sems ProccessSyncBy1Sem ProccessSyncBy1Mutex ProccessSyncBy1Spin
 
 all: $(TARGETS)
 
-ProccessRace: ProccessRace.o
+ProccessSyncBy2Sems: ProccessSyncBy2Sems.o
 	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-ProccessRace2: ProccessRace2.o
+ProccessSyncBy1Sem: ProccessSyncBy1Sem.o
 	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-ProccessRace3: ProccessRace3.o
+ProccessSyncBy1Mutex: ProccessSyncBy1Mutex.o
 	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-ProccessRace4: ProccessRace4.o
+ProccessSyncBy1Spin: ProccessSyncBy1Spin.o
 	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c

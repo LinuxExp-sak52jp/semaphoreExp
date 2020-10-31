@@ -1,9 +1,7 @@
 /*
- * sched_yield()では全然タスクスイッチしない。usleep(1)でも駄目。
- * usleep(4)だったらうまくいった。やはり、待っているリソースを取得する
- * までの時間をかせいであげないと、Ready queueに上がってこれないようだ。
- * Semaphoreよりはレスポンス良いが、LinuxのFIFO schedはあまり
- * あてにならないか？
+ * セマフォ一つの代わりにスピンロック一つで実装した。
+ * セマフォよりはレスポンスが良いが、sleepでないと同期がとれない
+ * 特性は全く同じ。
  */
 
 #include <stdio.h>
@@ -21,14 +19,12 @@
 #include <sys/shm.h>
 #include <pthread.h>
 
-const char *semName = "/mysem";
-
 void DoJob(void)
 {
 }
 void Move(void)
 {
-    usleep(4);
+    usleep(30);
 }
 
 void WriteSync(const char *string)
@@ -41,26 +37,23 @@ void WriteSync(const char *string)
 
 int main(int ac, char *av[])
 {
-    // 共有メモリ上にMutexを作成
-    pthread_mutex_t *mtx;
-    pthread_mutexattr_t mat;
+    // 共有メモリ上にSpinlockを作成
+    pthread_spinlock_t *lock;
     int shmid;
-    shmid = shmget(IPC_PRIVATE, sizeof(pthread_mutex_t), 0600);
+    shmid = shmget(IPC_PRIVATE, sizeof(pthread_spinlock_t), 0600);
     if (shmid < 0) {
         perror("shmget");
         return -1;
     }
-    mtx = (pthread_mutex_t *)shmat(shmid, NULL, 0);
-    if (mtx == (void *)-1) {
+    lock = (pthread_spinlock_t *)shmat(shmid, NULL, 0);
+    if (lock == (void *)-1) {
         perror("shmat");
         return -1;
     }
-    pthread_mutexattr_init(&mat);
-    if (pthread_mutexattr_setpshared(&mat, PTHREAD_PROCESS_SHARED)) {
-        perror("pthread_mutexattr_setpshared");
+    if (pthread_spin_init(lock, PTHREAD_PROCESS_SHARED)) {
+        perror("pthread_spin_init");
         return -1;
     }
-    pthread_mutex_init(mtx, &mat);
 
     // 親子ともSCHED_FIFOで動作させる
     struct sched_param param = {0};
@@ -77,45 +70,45 @@ int main(int ac, char *av[])
     pid_t cpid = fork();
     if (cpid == 0) {
         //-------------- 子プロセス -------------------
-        pthread_mutex_lock(mtx);
-        WriteSync("(1)Start 1st job of Child");
+        pthread_spin_lock(lock);
+        WriteSync("(2)Start 1st job of Child");
         DoJob();
-        WriteSync("(2)Waiting Parent done 1st job");
-        pthread_mutex_unlock(mtx);
+        WriteSync("(3)Waiting Parent done 1st job");
+        pthread_spin_unlock(lock);
         Move();
 
-        pthread_mutex_lock(mtx);
-        WriteSync("(3)Start 2nd job of Child");
+        pthread_spin_lock(lock);
+        WriteSync("(6)Start 2nd job of Child");
         DoJob();
-        WriteSync("(4)Child will exit");
-        pthread_mutex_unlock(mtx);
+        WriteSync("(7)Child will exit");
+        pthread_spin_unlock(lock);
         Move();
 
-        shmdt(mtx);
+        shmdt((void *)lock);
         
     } else {
         //------------ 親プロセス ---------------------
-        pthread_mutex_lock(mtx);
+        pthread_spin_lock(lock);
         WriteSync("(1)Waiting Child done 1st job");
-        pthread_mutex_unlock(mtx);
+        pthread_spin_unlock(lock);
         Move();
 
-        pthread_mutex_lock(mtx);
-        WriteSync("(2)Start 1st job of Parent");
+        pthread_spin_lock(lock);
+        WriteSync("(4)Start 1st job of Parent");
         DoJob();
-        WriteSync("(3)Waiting Child done 2nd job");
-        pthread_mutex_unlock(mtx);
+        WriteSync("(5)Waiting Child done 2nd job");
+        pthread_spin_unlock(lock);
         Move();
 
-        pthread_mutex_lock(mtx);
-        WriteSync("(4)Waiting Child exits");
-        pthread_mutex_unlock(mtx);
+        pthread_spin_lock(lock);
+        WriteSync("(8)Waiting Child exits");
+        pthread_spin_unlock(lock);
 
         int status;
         waitpid(cpid, &status, 0);
-        WriteSync("(5)Got child exied");
+        WriteSync("(9)Got child exied");
 
-        shmdt(mtx);
+        shmdt((void *)lock);
         if (shmctl(shmid, IPC_RMID, NULL) != 0) {
             perror("shmctl");
             return 1;
