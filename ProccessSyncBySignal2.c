@@ -1,6 +1,6 @@
 /*
  * Signalで確実な同期制御を行う実装。特にリアルタイムスケジューリングに
- * しなくても要件を満たせる方式。sigactionとpauseで実装。
+ * しなくても要件を満たせる方式。sigwaitで実装。
  */
 
 #include <stdio.h>
@@ -22,10 +22,6 @@
 void DoJob(void)
 {
 }
-void Move(void)
-{
-    usleep(4);
-}
 
 void WriteSync(const char *string)
 {
@@ -40,19 +36,18 @@ void SendSig(int pid)
     kill(pid, SIGUSR1);
 }
 
-void handler(int sig)
-{
-}
-
 int main(int ac, char *av[])
 {
-    // SIGUSRをハンドラーで受ける
-    struct sigaction act = {0};
-    act.sa_handler = handler;
-    if (sigaction(SIGUSR1, &act, NULL)) {
-        perror("sigaction");
+    // SIGUSR1で待つ設定
+    sigset_t sset;
+    sigemptyset(&sset);
+    sigaddset(&sset, SIGUSR1);
+    if (sigprocmask(SIG_BLOCK, &sset, NULL)) {
+        perror("sigprocmask");
         return -1;
     }
+    int sig;
+    
     // 親子ともSCHED_FIFOで動作させる
     struct sched_param param = {0};
     param.sched_priority = sched_get_priority_max(SCHED_FIFO);
@@ -73,7 +68,7 @@ int main(int ac, char *av[])
         WriteSync("(3)Waiting Parent done 1st job");
         SendSig(getppid());
 
-        pause();
+        sigwait(&sset, &sig);
         WriteSync("(6)Start 2nd job of Child");
         DoJob();
         WriteSync("(7)Child will exit");
@@ -83,15 +78,15 @@ int main(int ac, char *av[])
         //------------ 親プロセス ---------------------
         WriteSync("(1)Waiting Child done 1st job");
 
-        pause();
+        sigwait(&sset, &sig);
         WriteSync("(4)Start 1st job of Parent");
         DoJob();
         WriteSync("(5)Waiting Child done 2nd job");
         SendSig(cpid);
         
-        pause();
+        sigwait(&sset, &sig);
         WriteSync("(8)Waiting Child exits");
-        SendSig(cpid);
+        //SendSig(cpid);
 
         int status;
         waitpid(cpid, &status, 0);
